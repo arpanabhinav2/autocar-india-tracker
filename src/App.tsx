@@ -15,6 +15,9 @@ import { LoginModal, type AppUser } from './components/LoginModal';
 import { UserProfileDropdown } from './components/UserProfileDropdown';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { PaywallModal } from './components/PaywallModal';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 function App() {
   const [cars, setCars] = useState<Car[]>([]);
@@ -25,9 +28,18 @@ function App() {
   });
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
 
   const { selectedCars, setIsCompareModalOpen } = useCompare();
+
+  const handleCompareClick = () => {
+    if (!user || user.isPremiumPlus !== true) {
+      setIsPaywallModalOpen(true);
+    } else {
+      setIsCompareModalOpen(true);
+    }
+  };
 
   useEffect(() => {
     fetch('/data/cars.json')
@@ -42,13 +54,25 @@ function App() {
       });
 
     // Setup Firebase Auth Listener
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        let isPremiumPlus = false;
+        try {
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            isPremiumPlus = userSnap.data().isPremiumPlus || false;
+          }
+        } catch (err) {
+          console.error("Firestore sync error:", err);
+        }
+
         setUser({
           name: firebaseUser.displayName || 'User',
           email: firebaseUser.email || '',
           picture: firebaseUser.photoURL || '',
-          uid: firebaseUser.uid
+          uid: firebaseUser.uid,
+          isPremiumPlus
         });
       } else {
         setUser(null);
@@ -114,7 +138,7 @@ function App() {
             )}
 
             <button 
-              onClick={() => setIsCompareModalOpen(true)}
+              onClick={handleCompareClick}
               disabled={selectedCars.length === 0}
               className="btn-primary py-2 px-4 md:py-3 md:px-6 text-sm md:text-base border border-red-500/50"
             >
@@ -219,6 +243,23 @@ function App() {
       </div>
 
       <ComparisonMatrix />
+      
+      <PaywallModal 
+         isOpen={isPaywallModalOpen}
+         onClose={() => setIsPaywallModalOpen(false)}
+         user={user}
+         onRequireLogin={() => {
+            setIsPaywallModalOpen(false);
+            setIsLoginModalOpen(true);
+         }}
+         onSuccess={() => {
+            setIsPaywallModalOpen(false);
+            if (user) {
+              setUser({ ...user, isPremiumPlus: true });
+            }
+            setIsCompareModalOpen(true);
+         }}
+      />
       
       <LoginModal 
         isOpen={isLoginModalOpen} 

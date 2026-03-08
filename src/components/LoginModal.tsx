@@ -5,13 +5,15 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, Loader2 } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, googleProvider, db } from '../lib/firebase';
 
 export interface AppUser {
   name: string;
   email: string;
   picture: string;
   uid: string;
+  isPremiumPlus?: boolean;
 }
 
 interface LoginModalProps {
@@ -33,11 +35,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      let isPremiumPlus = false;
+      if (userSnap.exists()) {
+        isPremiumPlus = userSnap.data().isPremiumPlus || false;
+      } else {
+        await setDoc(userRef, {
+          email: user.email,
+          name: user.displayName,
+          isPremiumPlus: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
       onLogin({
         name: user.displayName || 'User',
         email: user.email || '',
         picture: user.photoURL || '',
-        uid: user.uid
+        uid: user.uid,
+        isPremiumPlus
       });
       onClose();
     } catch (err: any) {
