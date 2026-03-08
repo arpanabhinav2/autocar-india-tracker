@@ -49,7 +49,17 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
       const data = await response.json();
       const orderId = data.order_id;
       
-      // 2. Launch Juspay SDK
+      // 2. Load and Launch Juspay SDK dynamically
+      if (!window.Juspay) {
+         await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://api.juspay.in/core-express-checkout.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Failed to load Juspay SDK'));
+            document.head.appendChild(script);
+         });
+      }
+
       if (window.Juspay) {
          setShowJuspay(true);
          
