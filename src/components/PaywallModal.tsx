@@ -6,7 +6,7 @@ import { db } from '../lib/firebase';
 
 declare global {
   interface Window {
-    Juspay?: any;
+    Razorpay?: any;
   }
 }
 
@@ -21,7 +21,6 @@ interface PaywallModalProps {
 export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, user, onRequireLogin, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showJuspay, setShowJuspay] = useState(false);
 
   if (!isOpen) return null;
 
@@ -35,95 +34,96 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
       setLoading(true);
       setError('');
 
-      // 1. Call our Serverless Backend to create a Juspay session
-      const response = await fetch('/api/juspay-session', {
+      // 1. Create a Razorpay Order via our Serverless API
+      const response = await fetch('/api/razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, email: user.email })
+        body: JSON.stringify({ userId: user.uid })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to initialize payment session');
+        throw new Error('Failed to create Razorpay order');
       }
 
-      const data = await response.json();
-      const orderId = data.order_id;
+      const orderData = await response.json();
       
-      // 2. Load and Launch Juspay SDK dynamically
-      if (!window.Juspay) {
+      // 2. Load the Razorpay SDK dynamically if not already loaded via index.html
+      if (!window.Razorpay) {
          try {
              await new Promise((resolve, reject) => {
                 const script = document.createElement('script');
-                script.src = 'https://api.juspay.in/core-express-checkout.js';
+                script.src = 'https://checkout.razorpay.com/v1/checkout.js';
                 script.onload = resolve;
-                script.onerror = () => reject(new Error('Failed to load Juspay SDK'));
+                script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
                 document.head.appendChild(script);
              });
          } catch (e) {
-             console.warn("Juspay SDK could not be loaded from CDN. Proceeding to fallback.");
+             console.warn("Razorpay SDK could not be loaded. Proceeding to fallback.");
          }
       }
 
-      if (window.Juspay) {
-         setShowJuspay(true);
+      if (window.Razorpay) {
+         const options = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: "AutoCar India Tracker",
+            description: "Premium+ Lifetime Access",
+            image: "https://www.autocarindia.com/Images/logo.png",
+            order_id: orderData.id,
+            handler: async function (response: any) {
+               try {
+                  // Verify Payment Backend
+                  const verifyRes = await fetch('/api/razorpay-verify', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ 
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature 
+                     })
+                  });
+                  const verifyData = await verifyRes.json();
+                  
+                  if (verifyData.status === 'verified') {
+                     const userRef = doc(db, 'users', user.uid);
+                     await updateDoc(userRef, {
+                         isPremiumPlus: true,
+                         subscriptionDate: new Date().toISOString()
+                     });
+                     onSuccess();
+                  } else {
+                     throw new Error('Payment verification failed.');
+                  }
+               } catch (err: any) {
+                  setError(err.message || 'Payment processing failed.');
+               }
+            },
+            prefill: {
+               name: user.name,
+               email: user.email,
+            },
+            theme: {
+               color: "#eab308" // yellow-500
+            }
+         };
+
+         const rzp = new window.Razorpay(options);
          
-         window.Juspay.Setup({
-           initParams: {
-              merchantId: data.sdk_payload.payload.merchantId,
-              clientId: data.sdk_payload.payload.clientId,
-              environment: 'sandbox'
-           },
-           onResponse: async (response: any) => {
-              if (response.event === 'onPaymentSuccess') {
-                 try {
-                    // Verify Payment Backend
-                    const verifyRes = await fetch('/api/juspay-verify', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({ order_id: orderId })
-                    });
-                    const verifyData = await verifyRes.json();
-                    
-                    if (verifyData.status === 'CHARGED') {
-                       const userRef = doc(db, 'users', user.uid);
-                       await updateDoc(userRef, {
-                           isPremiumPlus: true,
-                           subscriptionDate: new Date().toISOString()
-                       });
-                       onSuccess();
-                    } else {
-                       throw new Error('Payment verification failed Server-side.');
-                    }
-                 } catch (err: any) {
-                    setError(err.message || 'Payment processing failed.');
-                 } finally {
-                    setShowJuspay(false);
-                 }
-              } else if (response.event === 'onPaymentFailure' || response.event === 'onPaymentCancel') {
-                 setError('Payment was cancelled or failed. Please try again.');
-                 setShowJuspay(false);
-              }
-           }
+         rzp.on('payment.failed', function (response: any){
+             setError(response.error.description || 'Payment Failed');
          });
+         
+         rzp.open();
          
       } else {
-         // --- FAILSAFE / MOCK PAYMENT FLOW ---
-         // If SDK is blocked by adblockers or CDN fails, run the manual mock immediately
-         window.alert("JUSPAY SDK BLOCKED BY BROWSER (e.g. AdBlocker or Brave Shields). Proceeding with Sandbox Simulation.\n\nImagine the secure PCI-DSS credit card screen here! Click OK to simulate a successful Rs. 500 payment.");
-         
-         // Securely update DB
-         const userRef = doc(db, 'users', user.uid);
-         await updateDoc(userRef, {
-             isPremiumPlus: true,
-             subscriptionDate: new Date().toISOString()
-         });
-         onSuccess();
+         // --- FAILSAFE FOR BROWSER BLOCKS ---
+         setError("Razorpay checkout was blocked by your browser. Please disable your AdBlocker or Brave Shields to complete the payment.");
       }
 
     } catch (err: any) {
       console.error('Checkout failed:', err);
       setError(err.message || 'Payment processing failed. Please try again.');
-      setShowJuspay(false);
     } finally {
       setLoading(false);
     }
@@ -178,7 +178,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
                  <Loader2 className="w-5 h-5 animate-spin" /> Processing Payment...
                </>
             ) : user ? (
-              <>Pay securely with Juspay</>
+              <>Pay securely with Razorpay</>
             ) : (
               <>Login to Continue</>
             )}
@@ -189,9 +189,6 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
           </div>
           {error && <p className="text-red-500 text-xs mt-3 text-center w-full">{error}</p>}
         </div>
-        
-        {/* Container for Juspay iframe */}
-        <div id="juspay-checkout-container" className={`mt-4 ${showJuspay ? 'block' : 'hidden'}`}></div>
       </div>
     </div>
   );
