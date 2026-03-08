@@ -4,6 +4,12 @@ import { type AppUser } from './LoginModal';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
+declare global {
+  interface Window {
+    Juspay?: any;
+  }
+}
+
 interface PaywallModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +21,7 @@ interface PaywallModalProps {
 export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, user, onRequireLogin, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showJuspay, setShowJuspay] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,37 +49,75 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
       const data = await response.json();
       const orderId = data.order_id;
       
-      // 2. Here you would normally launch the Juspay SDK using the payload
-      // window.Juspay.Setup({ payload: data.sdk_payload });
-      
-      // --- MOCK PAYMENT FLOW ---
-      // Simulating user completing payment through Juspay UI
-      await new Promise(res => setTimeout(res, 2000));
-      
-      // 3. Verify Payment
-      const verifyResponse = await fetch('/api/juspay-verify', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ order_id: orderId })
-      });
-      const verifyData = await verifyResponse.json();
-      
-      if (verifyData.status === 'CHARGED') {
-         // Update Firestore Database completely securely
-         const userRef = doc(db, 'users', user.uid);
-         await updateDoc(userRef, {
-             isPremiumPlus: true,
-             subscriptionDate: new Date().toISOString()
+      // 2. Launch Juspay SDK
+      if (window.Juspay) {
+         setShowJuspay(true);
+         
+         window.Juspay.Setup({
+           initParams: {
+              merchantId: data.sdk_payload.payload.merchantId,
+              clientId: data.sdk_payload.payload.clientId,
+              environment: 'sandbox'
+           },
+           onResponse: async (response: any) => {
+              if (response.event === 'onPaymentSuccess') {
+                 try {
+                    // Verify Payment Backend
+                    const verifyRes = await fetch('/api/juspay-verify', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ order_id: orderId })
+                    });
+                    const verifyData = await verifyRes.json();
+                    
+                    if (verifyData.status === 'CHARGED') {
+                       const userRef = doc(db, 'users', user.uid);
+                       await updateDoc(userRef, {
+                           isPremiumPlus: true,
+                           subscriptionDate: new Date().toISOString()
+                       });
+                       onSuccess();
+                    } else {
+                       throw new Error('Payment verification failed Server-side.');
+                    }
+                 } catch (err: any) {
+                    setError(err.message || 'Payment processing failed.');
+                 } finally {
+                    setShowJuspay(false);
+                 }
+              } else if (response.event === 'onPaymentFailure' || response.event === 'onPaymentCancel') {
+                 setError('Payment was cancelled or failed. Please try again.');
+                 setShowJuspay(false);
+              }
+           }
          });
          
-         onSuccess();
+         // In a real implementation you would render the Checkout in a specific div.
+         // For sandbox, we will just simulate success after initiating setup.
+         setTimeout(() => {
+           window.alert("JUSPAY SANDBOX MOCK: Imagine the PCI-DSS compliant credit card screen here! Click OK to simulate a successful Rs. 500 payment.");
+           // Trigger success callback manually since this is sandbox without real keys
+           if (window.Juspay && typeof window.Juspay.Setup === 'function') {
+              // Usually the SDK handles this part, we are mocking the success event
+               const userRef = doc(db, 'users', user.uid);
+               updateDoc(userRef, {
+                   isPremiumPlus: true,
+                   subscriptionDate: new Date().toISOString()
+               }).then(() => {
+                   setShowJuspay(false);
+                   onSuccess();
+               });
+           }
+         }, 1000);
+         
       } else {
-         throw new Error('Payment was not successful');
+         throw new Error('Juspay SDK not loaded in browser');
       }
 
     } catch (err: any) {
       console.error('Checkout failed:', err);
       setError(err.message || 'Payment processing failed. Please try again.');
+      setShowJuspay(false);
     } finally {
       setLoading(false);
     }
@@ -138,6 +183,9 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ isOpen, onClose, use
           </div>
           {error && <p className="text-red-500 text-xs mt-3 text-center w-full">{error}</p>}
         </div>
+        
+        {/* Container for Juspay iframe */}
+        <div id="juspay-checkout-container" className={`mt-4 ${showJuspay ? 'block' : 'hidden'}`}></div>
       </div>
     </div>
   );
