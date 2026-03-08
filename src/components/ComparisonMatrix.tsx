@@ -1,3 +1,9 @@
+/**
+ * ComparisonMatrix.tsx
+ * The core comparative utility. Renders a side-by-side spec sheet table
+ * for up to 3 selected vehicles, automatically highlighting class-leading 
+ * numeric specifications (like highest power or highest boot space).
+ */
 import React from 'react';
 import { useCompare } from '../context/CompareContext';
 import { X, CheckCircle2, AlertCircle, Trash2, Gauge, Plus } from 'lucide-react';
@@ -218,7 +224,7 @@ export const ComparisonMatrix: React.FC = () => {
   );
 };
 
-// Helper component
+// Helper component to render individual table rows and calculate best-in-class highlights
 const TableRow = ({ 
   label, 
   cars, 

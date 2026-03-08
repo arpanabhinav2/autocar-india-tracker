@@ -1,73 +1,94 @@
-# React + TypeScript + Vite
+# AutoCar India Tracker 🚗⚡
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![AutoCar India Tracker Banner](https://i.imgur.com/kYZR248.png) <!-- *Placeholder for an actual screenshot* -->
 
-Currently, two official plugins are available:
+**AutoCar India Tracker** is a modern, high-performance web application that serves as the ultimate automotive database. By autonomously scraping, transcribing, and utilizing AI Large Language Models (LLMs) on recent YouTube car reviews from Autocar India, it provides enthusiasts with a premium, easily filterable, and comparable database of the latest vehicles in the Indian market.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ✨ Key Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Autonomous Data Engine:** A Node.js backend that routinely fetches the newest car review videos from YouTube.
+- **Dual-Source Extraction:** 
+  - *Source A:* YouTube Data API (Video metadata, thumbnails)
+  - *Source B:* `yt-dlp` + Groq Whisper AI (Audio transcription fallback to bypass YouTube's strict anti-bot measures)
+- **AI-Powered Specifications:** Feeds pristine audio transcripts into **Groq Llama 3** (with Gemini fallback) to perfectly structure and extract complex automotive specifications (BHP, Torque, Range, Ground Clearance, etc.) to a `.json` format.
+- **Premium Frontend:** Built with React, TypeScript, and TailwindCSS featuring a beautiful, slick, dark-themed "glassmorphism" aesthetic.
+- **Comparison Matrix:** State management allows users to select up to 3 cars and compare them side-by-side on performance, efficiency, practicality, and safety.
+- **Instant Filtering:** Filter the database dynamically by segment (SUV, EV, Sedan) and budget (Under 10L, 10L-20L, 20L+).
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛠 Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Frontend Framework:** React 18 + Vite  
+**Language:** TypeScript  
+**Styling:** Tailwind CSS + Lucide React (Icons)  
+**Backend/Data Engine:** Node.js, Axios, `youtube-transcript`, `yt-dlp`  
+**AI Integration:** Groq API (Llama 3.3 70B & Whisper Large v3), Google Gemini API  
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🚀 Getting Started (Local Development)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v16 or higher)
+- [Git](https://git-scm.com/)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) (Must be present in `data-engine` directory for audio transcription)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 1. Clone the repository
+\`\`\`bash
+git clone https://github.com/YOUR_USERNAME/autocar-india-tracker.git
+cd autocar-india-tracker
+\`\`\`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### 2. Install dependencies
+\`\`\`bash
+npm install
+cd data-engine
+npm install
+cd ..
+\`\`\`
+
+### 3. Environment Variables
+To run the Data Engine, you need API keys. Create a `.env` file in the `data-engine` folder:
+\`\`\`env
+# Autocar India YouTube Channel ID
+YOUTUBE_CHANNEL_ID=UCxPCOQ5h3y5tTq_q56Zg8jQ
+
+# YouTube Data API v3 key
+YOUTUBE_API_KEY=YOUR_YOUTUBE_KEY
+
+# Groq API Key (Primary Llama 3 & Whisper)
+GROQ_API_KEY=YOUR_GROQ_KEY
+
+# Google Gemini API Key (Fallback)
+GEMINI_API_KEY=YOUR_GEMINI_KEY
+\`\`\`
+
+### 4. Fetch the Latest Data
+Run the scraping and AI-extraction script to generate `cars.json`:
+\`\`\`bash
+cd data-engine
+node fetchCars.js
+\`\`\`
+
+### 5. Run the Frontend
+\`\`\`bash
+npm run dev
+\`\`\`
+The application will be available at `http://localhost:5173`.
+
+---
+
+## 🌩 Deployment
+
+This application is configured for seamless deployment on **Vercel**. Since the heavy-lifting (the AI extraction) is done locally via the data engine to output a static `cars.json`, the frontend acts as a lightning-fast static site.
+
+1. Install Vercel CLI: \`npm i -g vercel\`
+2. Run \`vercel --prod\` in the root directory.
+
+---
+
+## 📜 License & Disclaimers
+This project is for educational and portfolio purposes. It is not affiliated with, endorsed by, or sponsored by Autocar India or Haymarket SAC Publishing. All video content, thumbnails, and quotes belong to their respective owners.

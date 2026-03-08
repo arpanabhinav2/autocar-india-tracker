@@ -1,3 +1,8 @@
+/**
+ * FilterSidebar.tsx
+ * UI component providing a horizontally scrolling filter bar.
+ * Allows users to filter the car grid based on predefined segments and budgets.
+ */
 import React, { useRef } from 'react';
 import { Filter, X, ChevronRight, ChevronLeft } from 'lucide-react';
 

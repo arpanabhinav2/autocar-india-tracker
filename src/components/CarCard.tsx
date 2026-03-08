@@ -1,3 +1,9 @@
+/**
+ * CarCard.tsx
+ * A premium Glassmorphism presentation component representing a single vehicle.
+ * Dynamically displays standard specs, AI confidence levels, and handles
+ * the "Add to Compare" interaction logic.
+ */
 import React from 'react';
 import { type Car } from '../types/car';
 import { useCompare } from '../context/CompareContext';

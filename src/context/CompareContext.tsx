@@ -1,3 +1,9 @@
+/**
+ * CompareContext.tsx
+ * React Context provider managing global state for the Comparison feature.
+ * Handles adding/removing cars from the comparison tray (max 3) and toggling
+ * the visibility of the ComparisonMatrix modal.
+ */
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 import { type Car } from '../types/car';
 

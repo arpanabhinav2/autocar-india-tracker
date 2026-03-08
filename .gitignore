@@ -27,3 +27,9 @@ dist-ssr
 .env
 yt-dlp.exe
 temp_*.m4a
+
+.vercel
+
+# Data Engine Outputs
+data-engine/*.html
+data-engine/test*.json
