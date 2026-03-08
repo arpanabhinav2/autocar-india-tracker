@@ -1,0 +1,185 @@
+import { useEffect, useState, useMemo } from 'react';
+import { type Car } from './types/car';
+import { CarCard } from './components/CarCard';
+import { FilterBar, type FilterState } from './components/FilterSidebar';
+import { ComparisonMatrix } from './components/ComparisonMatrix';
+import { useCompare } from './context/CompareContext';
+import { Car as CarIcon, Scale, Loader2, ChevronRight } from 'lucide-react';
+
+function App() {
+  const [cars, setCars] = useState<Car[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<FilterState>({
+    segment: 'All',
+    budget: 'All'
+  });
+
+  const { selectedCars, setIsCompareModalOpen } = useCompare();
+
+  useEffect(() => {
+    fetch('/data/cars.json')
+      .then(res => res.json())
+      .then(data => {
+        setCars(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch cars target data:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  const filteredCars = useMemo(() => {
+    return cars.filter(car => {
+      if (filters.segment !== 'All' && car.segment !== filters.segment) {
+        if (filters.segment === 'SUV' && !car.segment.includes('SUV')) return false;
+        if (filters.segment !== 'SUV' && car.segment.toLowerCase() !== filters.segment.toLowerCase()) return false;
+      }
+      if (filters.budget !== 'All') {
+        const priceStr = car.price.replace(/[^\d.]/g, '');
+        const priceNum = parseFloat(priceStr);
+        if (isNaN(priceNum)) return true;
+        
+        const unit = car.price.toLowerCase().includes('crore') ? 100 : 1;
+        const normalizedPrice = priceNum * unit;
+
+        if (filters.budget === '0-10' && normalizedPrice > 10) return false;
+        if (filters.budget === '10-20' && (normalizedPrice < 10 || normalizedPrice > 20)) return false;
+        if (filters.budget === '20+' && normalizedPrice <= 20) return false;
+      }
+      return true;
+    });
+  }, [cars, filters]);
+
+
+
+  return (
+    <div className="min-h-screen font-sans flex flex-col relative w-full overflow-x-hidden">
+      
+      {/* Top Header */}
+      <header className="fixed top-0 w-full z-40 bg-black/70 backdrop-blur-xl border-b border-white/10 transition-all duration-500 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 md:h-24 flex items-center justify-between">
+          <div className="flex items-center gap-4 group cursor-pointer">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-red-600 to-orange-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.5)] transform group-hover:-rotate-6 transition-all duration-300">
+              <CarIcon className="w-6 h-6 md:w-7 md:h-7 text-white transform group-hover:rotate-6 transition-all duration-300" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-3xl font-display font-black tracking-tighter leading-none text-white whitespace-nowrap">
+                AUTOCAR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">TRACKER</span>
+              </h1>
+              <p className="text-[9px] md:text-[11px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-1 hidden sm:block">India's Premium Reviews</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <button 
+              onClick={() => setIsCompareModalOpen(true)}
+              disabled={selectedCars.length === 0}
+              className="btn-primary py-2 px-4 md:py-3 md:px-6 text-sm md:text-base border border-red-500/50"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                <Scale className="w-4 h-4 md:w-5 md:h-5 text-white/90" />
+                <span className="hidden sm:inline tracking-wide uppercase text-xs md:text-sm">Compare</span>
+                {selectedCars.length > 0 && (
+                  <span className="bg-white/20 text-white backdrop-blur-md px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs ml-1 md:ml-2 shadow-inner border border-white/20">
+                    {selectedCars.length}/3
+                  </span>
+                )}
+              </span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <div className="relative pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden bg-[#050505] animate-fade-in border-b border-white/5">
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent" />
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LCAyNTUsIDI1NSwgMC4wNSkiLz48L3N2Zz4=')] [mask-image:linear-gradient(to_bottom,white,transparent)]" />
+        </div>
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 md:mt-16 text-center">
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-display font-black text-white leading-[1.1] mb-6 tracking-tight drop-shadow-2xl">
+            The Ultimate <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Database</span>
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto mb-10 text-base md:text-lg leading-relaxed">
+            AI-powered insights pulling specifications directly from video transcripts. Filter, discover, and compare India's latest car reviews with perfect accuracy.
+          </p>
+          <button 
+            onClick={() => {
+              const el = document.getElementById('discover');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="btn-primary w-full sm:w-auto px-10 py-4 text-base md:text-lg border border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.4)] mx-auto inline-flex"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 font-black tracking-wide uppercase">
+              Explore Vehicles <ChevronRight className="w-5 h-5" />
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div id="discover" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-12 md:py-20 relative z-20 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+        
+        {/* Horizontal Filters Section */}
+        <FilterBar 
+          filters={filters} 
+          setFilters={setFilters} 
+        />
+
+        <main className="w-full">
+          <div className="mb-8 md:mb-12 flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <h2 className="text-2xl md:text-4xl font-display font-black text-white tracking-tight">Vehicle Database</h2>
+              <div className="h-1 w-16 md:w-24 bg-gradient-to-r from-red-600 to-orange-500 mt-2 md:mt-3 mb-2 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div>
+            </div>
+            <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl">
+               <span className="text-red-500 font-black mr-2">{filteredCars.length}</span>
+               <span className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest hidden sm:inline">Results found</span>
+               <span className="text-gray-400 font-bold text-xs uppercase tracking-widest sm:hidden">Cars</span>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="h-64 md:h-96 flex flex-col items-center justify-center gap-6 glass-card border border-white/10">
+              <div className="relative">
+                <div className="absolute inset-0 bg-red-600 rounded-full blur-[40px] opacity-40 animate-pulse-slow"></div>
+                <Loader2 className="w-12 h-12 text-white animate-spin relative z-10" />
+              </div>
+              <p className="font-black tracking-[0.2em] uppercase text-sm text-gray-400">Loading Database...</p>
+            </div>
+          ) : filteredCars.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {filteredCars.map((car, idx) => (
+                <div key={car.id} className="animate-slide-up" style={{ animationDelay: `${(idx % 6) * 0.1}s` }}>
+                  <CarCard car={car} />
+                </div>
+              ))}
+            </div>
+          ) : (
+             <div className="glass-card p-8 md:p-16 text-center rounded-[2rem] flex flex-col items-center justify-center border border-white/10 bg-[#0a0a0f]/50">
+               <div className="w-24 h-24 bg-red-600/10 rounded-full flex items-center justify-center mb-8 border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
+                 <CarIcon className="w-10 h-10 text-red-500" />
+               </div>
+               <h3 className="text-3xl font-black font-display text-white mb-4 tracking-tight">No Vehicles Match</h3>
+               <p className="text-gray-400 max-w-md mx-auto mb-10 text-base md:text-lg leading-relaxed">
+                 We couldn't find any cars matching your precise specifications. Try widening your search filters.
+               </p>
+               <button 
+                 onClick={() => setFilters({ segment: 'All', budget: 'All'})}
+                 className="btn-primary px-10 border border-red-500/50"
+               >
+                 <span className="relative z-10 font-black tracking-widest uppercase text-sm">Clear All Filters</span>
+               </button>
+             </div>
+          )}
+        </main>
+      </div>
+
+      <ComparisonMatrix />
+    </div>
+  );
+}
+
+export default App;
